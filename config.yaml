@@ -1,0 +1,50 @@
+gpio:
+  devices:
+    - name: led_1
+      type: LED
+      pin: 17
+    - name: button_1
+      type: Button
+      pin: 18
+      pull_up: true
+    - name: relay_1
+      type: OutputDevice
+      pin: 23
+      active_high: true
+
+sensors:
+  read_interval: 5
+  devices: []
+  # Example:
+  # - name: dht22_1
+  #   type: DHT22
+  #   pin: 4
+  # - name: bme280_1
+  #   type: BME280
+  #   i2c_address: 0x76
+
+camera:
+  enabled: false
+  device_index: 0
+  width: 640
+  height: 480
+  fps: 30
+
+mqtt:
+  reconnect_delay: 5
+  keepalive: 60
+  topics:
+    sensors: dhn-pi/sensors
+    commands: dhn-pi/commands
+    status: dhn-pi/status
+
+web:
+  host: "0.0.0.0"
+  port: 8000
+  reload: true
+  swagger_enabled: true
+  app_env: development
+
+scheduler:
+  sensor_poll_interval: 5
+  heartbeat_interval: 30

@@ -1,0 +1,13 @@
+gpiozero
+loguru
+paho-mqtt
+python-dotenv
+PyYAML
+pydantic
+pydantic-settings
+aiosqlite
+opencv-python
+smbus2
+fastapi
+uvicorn[standard]
+apscheduler
