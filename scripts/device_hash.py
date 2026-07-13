@@ -1,18 +1,33 @@
 import argparse
 import hashlib
+import platform
+import subprocess
 import time
 import sys
 
 def get_serial():
+    os_name = platform.system()
+
     try:
-        with open('/proc/cpuinfo', 'r') as f:
-            for line in f:
-                if line.startswith('Serial'):
-                    return line.split(':')[1].strip()
-        # Nếu đã duyệt hết file mà không thấy dòng Serial
-        raise Exception("Không tìm thấy thông số Serial trong hệ thống!")
-    except FileNotFoundError:
-        raise Exception("Hệ thống không phải Raspberry Pi (không tìm thấy /proc/cpuinfo)")
+        if os_name == "Linux":
+            try:
+                with open("/proc/cpuinfo", "r") as f:
+                    for line in f:
+                        if "Serial" in line:
+                            return line.split(":")[1].strip()
+            except:
+                pass
+
+            cmd = "cat /sys/class/dmi/id/product_serial"
+            return subprocess.check_output(cmd, shell=True).decode().strip()
+
+        elif os_name == "Darwin":
+            cmd = "system_profiler SPHardwareDataType | grep 'Serial Number (system)' | awk '{print $4}'"
+            return subprocess.check_output(cmd, shell=True).decode().strip()
+
+        else:
+            raise Exception(f"Hệ điều hành {os_name} chưa được hỗ trợ.")
+
     except Exception as e:
         raise Exception(f"Lỗi truy xuất phần cứng: {e}")
 

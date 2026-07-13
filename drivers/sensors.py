@@ -40,7 +40,7 @@ class SensorManager:
         for sensor_name, values in data.items():
             if values:
                 for cb in self._on_data:
-                    await cb(f"dhn-pi/sensors", {
+                    await cb(self._config.mqtt.topics.sensors, {
                         "sensor": sensor_name,
                         "ts": asyncio.get_event_loop().time(),
                         "values": values,

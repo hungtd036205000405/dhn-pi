@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import ssl
 import time
@@ -10,11 +11,13 @@ import paho.mqtt.client as mqtt
 from loguru import logger
 
 from config.settings import AppConfig
+from services.system_stats import SystemStats
 
 
 class MQTTClient:
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, stats: SystemStats | None = None) -> None:
         mqtt_cfg = config.mqtt
+        self._stats = stats
         self._broker = mqtt_cfg.broker
         self._port = mqtt_cfg.port
         self._username = mqtt_cfg.username
@@ -39,15 +42,29 @@ class MQTTClient:
             self._message_handlers[topic] = []
         self._message_handlers[topic].append(callback)
 
+    @property
+    def is_connected(self) -> bool:
+        return self._client.is_connected()
+
+    async def wait_until_connected(self, timeout: int = 10) -> bool:
+        start = time.time()
+        while not self.is_connected:
+            if time.time() - start > timeout:
+                logger.error(f"MQTT not connected after {timeout}s")
+                return False
+            await asyncio.sleep(0.2)
+        logger.info("MQTT connection ready")
+        return True
+
     def connect(self) -> None:
         if self._username:
             self._client.username_pw_set(self._username, self._password)
 
         self._client.reconnect_delay_set(min_delay=1, max_delay=self._reconnect_delay)
 
+        logger.info(f"MQTT connecting to {self._broker}:{self._port}")
         try:
             self._client.connect(self._broker, self._port, self._keepalive)
-            logger.info(f"MQTT connecting to {self._broker}:{self._port}")
         except Exception as e:
             logger.error(f"MQTT connection failed: {e}")
 
@@ -61,7 +78,30 @@ class MQTTClient:
         self._client.disconnect()
         logger.info("MQTT disconnected")
 
+    _RC_MSGS: dict[int, str] = {
+        0: "Success",
+        1: "Out of memory",
+        2: "Protocol error",
+        3: "Invalid parameter",
+        4: "Not connected",
+        5: "Connection refused",
+        6: "Not found",
+        7: "Connection lost",
+        8: "TLS error",
+        9: "Payload too large",
+        10: "Not supported",
+        11: "Authentication failed",
+        12: "ACL denied",
+        13: "Unknown error",
+        14: "Errno error",
+        15: "Queue full",
+    }
+
     def publish(self, topic: str, payload: dict[str, Any] | str, qos: int = 1) -> None:
+        if not self.is_connected:
+            logger.warning(f"MQTT not connected, dropping publish to {topic}")
+            return
+
         if isinstance(payload, dict):
             payload = json.dumps(payload, default=str)
 
@@ -69,7 +109,7 @@ class MQTTClient:
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
             logger.debug(f"MQTT published -> {topic}")
         else:
-            logger.error(f"MQTT publish failed: {result.rc}")
+            logger.error(f"MQTT publish failed: {self._RC_MSGS.get(result.rc, 'Unknown')} (rc={result.rc})")
 
     def subscribe(self, topic: str, qos: int = 1) -> None:
         self._client.subscribe(topic, qos=qos)
@@ -79,7 +119,8 @@ class MQTTClient:
         if rc == 0:
             logger.info("MQTT connected to EMQX broker")
             self.subscribe(self._topics.commands)
-            self.publish(self._topics.status, {"status": "online", "ts": time.time()})
+            payload = self._stats.get_status_payload() if self._stats else {"status": "online", "ts": time.time()}
+            self.publish(self._topics.status, payload)
         else:
             rc_map = {
                 1: "Incorrect protocol version",
@@ -88,7 +129,7 @@ class MQTTClient:
                 4: "Bad username or password",
                 5: "Not authorized",
             }
-            logger.error(f"MQTT connection failed: {rc_map.get(rc, f'Unknown error {rc}')}")
+            logger.error(f"MQTT connection failed (rc={rc}): {rc_map.get(rc, f'Unknown error {rc}')}")
 
     def _on_disconnect(self, client, userdata, rc) -> None:
         if rc != 0:

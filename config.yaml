@@ -34,9 +34,12 @@ mqtt:
   reconnect_delay: 5
   keepalive: 60
   topics:
-    sensors: dhn-pi/sensors
-    commands: dhn-pi/commands
-    status: dhn-pi/status
+    sensors: dev/pi/{device_code}/sensors
+    commands: dev/pi/{device_code}/commands
+    status: pi/{device_code}/status
+
+device_code: PI-000001
+version: 0.0.1
 
 web:
   host: "0.0.0.0"

@@ -10,6 +10,7 @@ from drivers.gpio import GPIODeviceManager
 from drivers.camera import CameraManager
 from drivers.sensors import SensorManager
 from services.mqtt_client import MQTTClient
+from services.system_stats import SystemStats
 from services.web_server import create_app
 from services.scheduler import SchedulerService
 
@@ -21,8 +22,9 @@ class Controller:
         self.gpio = GPIODeviceManager(config)
         self.sensors = SensorManager(config)
         self.camera = CameraManager(config)
-        self.mqtt = MQTTClient(config)
-        self.scheduler = SchedulerService(config, self.mqtt, self.sensors)
+        self.stats = SystemStats(config)
+        self.mqtt = MQTTClient(config, stats=self.stats)
+        self.scheduler = SchedulerService(config, self.mqtt, self.sensors, stats=self.stats)
         self._web_task: asyncio.Task | None = None
         self._shutdown_event = asyncio.Event()
         self._on_sensor_data: list[Callable[[str, dict], Coroutine]] = []
@@ -48,7 +50,10 @@ class Controller:
         self.mqtt.connect()
         self.mqtt.loop_start()
 
-        self.scheduler.start(event_loop=asyncio.get_event_loop())
+        if await self.mqtt.wait_until_connected(timeout=10):
+            self.scheduler.start(event_loop=asyncio.get_event_loop())
+        else:
+            logger.warning("MQTT not connected, scheduler not started")
 
         app = create_app(self.config, self)
         import uvicorn
@@ -66,8 +71,8 @@ class Controller:
             log_level="info",
             reload=reload,
         )
-        server = uvicorn.Server(server_config)
-        self._web_task = asyncio.create_task(server.serve())
+        self._server = uvicorn.Server(server_config)
+        self._web_task = asyncio.create_task(self._server.serve())
 
         logger.info(f"Web server running at http://{self.config.web.host}:{self.config.web.port}")
         if self.config.web.swagger_enabled:
@@ -77,12 +82,16 @@ class Controller:
     async def stop(self) -> None:
         logger.info("Shutting down DHN-Pi controller...")
 
-        if self._web_task:
-            self._web_task.cancel()
+        if self._web_task and self._server:
+            self._server.should_exit = True
             try:
-                await self._web_task
-            except asyncio.CancelledError:
-                pass
+                await asyncio.wait_for(self._web_task, timeout=5)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                self._web_task.cancel()
+                try:
+                    await self._web_task
+                except asyncio.CancelledError:
+                    pass
 
         self.scheduler.stop()
         self.mqtt.loop_stop()

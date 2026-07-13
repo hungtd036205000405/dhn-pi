@@ -11,3 +11,4 @@ smbus2
 fastapi
 uvicorn[standard]
 apscheduler
+psutil

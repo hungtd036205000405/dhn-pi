@@ -6,13 +6,15 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from loguru import logger
 
 from config.settings import AppConfig
+from services.system_stats import SystemStats
 
 
 class SchedulerService:
-    def __init__(self, config: AppConfig, mqtt_client, sensor_manager) -> None:
+    def __init__(self, config: AppConfig, mqtt_client, sensor_manager, stats: SystemStats | None = None) -> None:
         self._config = config
         self._mqtt = mqtt_client
         self._sensors = sensor_manager
+        self._stats = stats
         self._scheduler: AsyncIOScheduler | None = None
 
     def start(self, event_loop=None) -> None:
@@ -57,9 +59,7 @@ class SchedulerService:
 
     async def _send_heartbeat(self) -> None:
         try:
-            self._mqtt.publish(
-                self._config.mqtt.topics.status,
-                {"status": "online", "ts": time.time(), "type": "heartbeat"},
-            )
+            payload = self._stats.get_status_payload(extra={"type": "heartbeat"}) if self._stats else {"status": "online", "ts": time.time(), "type": "heartbeat"}
+            self._mqtt.publish(self._config.mqtt.topics.status, payload)
         except Exception as e:
             logger.error(f"Scheduler heartbeat error: {e}")

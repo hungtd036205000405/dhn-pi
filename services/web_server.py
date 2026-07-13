@@ -241,7 +241,7 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
         topic: str = Query(
             ...,
             description="MQTT topic to publish to.",
-            examples=["dhn-pi/commands"],
+            examples=["pi/{device_code}/commands"],
         ),
         body: MQTTPublishRequest = Body(...),
     ):

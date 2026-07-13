@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def get_serial_number():
-    os_name = platform.system()remote
+    os_name = platform.system()
     
     try:
         if os_name == "Linux":
