@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import platform
 from typing import Any
 
-import cv2
 from loguru import logger
 
 from config.settings import AppConfig
@@ -12,6 +12,28 @@ from config.settings import AppConfig
 class CameraScanner:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
+
+    @staticmethod
+    def _is_capture_device(idx: int) -> bool:
+        skip = ["bcm2835", "isp", "codec", "metadata", "mmal", "feeder"]
+        try:
+            with open(f"/sys/class/video4linux/video{idx}/name") as f:
+                name = f.read().strip().lower()
+            return not any(kw in name for kw in skip)
+        except FileNotFoundError:
+            return True
+
+    @staticmethod
+    def _test_ffmpeg(dev: str) -> bool:
+        import subprocess
+        try:
+            r = subprocess.run(
+                ["ffmpeg", "-f", "v4l2", "-t", "0.2", "-i", dev, "-f", "null", "-"],
+                capture_output=True, timeout=2,
+            )
+            return r.returncode == 0
+        except Exception:
+            return False
 
     async def scan_webcams(self) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -59,22 +81,25 @@ class CameraScanner:
         return results
 
     async def get_available_usb(self) -> list[int]:
-        available: list[int] = []
         system = platform.system()
         if system == "Linux":
-            import glob, subprocess
+            import asyncio, glob
+            candidates = []
             for dev in sorted(glob.glob("/dev/video*")):
-                try:
-                    r = subprocess.run(
-                        ["ffmpeg", "-f", "v4l2", "-t", "0.2", "-i", dev, "-f", "null", "-"],
-                        capture_output=True, timeout=2,
-                    )
-                    if r.returncode == 0:
-                        idx = int(dev.replace("/dev/video", ""))
-                        available.append(idx)
-                except (ValueError, OSError, subprocess.TimeoutExpired):
-                    pass
+                idx = int(dev.replace("/dev/video", ""))
+                if self._is_capture_device(idx):
+                    candidates.append(dev)
+            results = await asyncio.gather(*[
+                asyncio.to_thread(self._test_ffmpeg, dev)
+                for dev in candidates
+            ])
+            return [
+                int(candidates[i].replace("/dev/video", ""))
+                for i, ok in enumerate(results) if ok
+            ]
         elif system == "Darwin":
+            import cv2
+            available = []
             for idx in range(4):
                 try:
                     cap = cv2.VideoCapture(idx)
@@ -83,7 +108,8 @@ class CameraScanner:
                         cap.release()
                 except Exception:
                     pass
-        return available
+            return available
+        return []
 
     async def scan_network(self, subnet: str | None = None) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -124,13 +150,14 @@ class CameraScanner:
         return results
 
     async def _check_rtsp(self, url: str, timeout: int) -> bool:
+        import subprocess
         try:
-            cap = cv2.VideoCapture(url)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                cap.release()
-                return ret
-            cap.release()
+            r = await asyncio.to_thread(
+                subprocess.run,
+                ["ffprobe", "-t", str(timeout), "-i", url, "-show_entries",
+                 "format=duration", "-of", "csv=p=0", "-loglevel", "quiet"],
+                capture_output=True, timeout=timeout + 1,
+            )
+            return r.returncode == 0
         except Exception:
-            pass
-        return False
+            return False
