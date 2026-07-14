@@ -6,7 +6,7 @@ PyYAML
 pydantic
 pydantic-settings
 aiosqlite
-opencv-python
+opencv-python-headless
 smbus2
 fastapi
 uvicorn[standard]
