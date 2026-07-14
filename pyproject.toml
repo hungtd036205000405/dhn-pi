@@ -1,3 +1,43 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dhn-pi"
+version = "0.1.0"
+description = "IoT edge controller for Raspberry Pi - GPIO, sensors, camera, MQTT"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "gpiozero",
+    "loguru",
+    "paho-mqtt",
+    "python-dotenv",
+    "PyYAML",
+    "pydantic",
+    "pydantic-settings",
+    "aiosqlite",
+    "opencv-python-headless",
+    "smbus2",
+    "fastapi",
+    "uvicorn[standard]",
+    "apscheduler",
+    "psutil",
+]
+
+[project.scripts]
+dhn-pi = "main:run"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["config*", "core*", "drivers*", "services*", "scripts*"]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

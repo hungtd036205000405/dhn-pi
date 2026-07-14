@@ -1,4 +1,5 @@
 import asyncio
+import platform
 import signal
 import sys
 
@@ -24,6 +25,11 @@ logger.add(
 _controller: Controller | None = None
 
 
+def _signal_handler() -> None:
+    if _controller:
+        asyncio.create_task(_controller.stop())
+
+
 async def main() -> None:
     global _controller
 
@@ -37,8 +43,14 @@ async def main() -> None:
     _controller = Controller(config)
 
     loop = asyncio.get_event_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
+    if platform.system() == "Windows":
+        def _win_signal_handler(signum, frame):
+            asyncio.get_running_loop().call_soon_threadsafe(_signal_handler)
+        signal.signal(signal.SIGINT, _win_signal_handler)
+        signal.signal(signal.SIGTERM, _win_signal_handler)
+    else:
+        for sig_ in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig_, _signal_handler)
 
     await _controller.start()
     await _controller.wait_for_shutdown()
@@ -51,5 +63,9 @@ async def shutdown() -> None:
         _controller = None
 
 
-if __name__ == "__main__":
+def run() -> None:
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

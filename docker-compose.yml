@@ -1,0 +1,22 @@
+services:
+  dhn-pi:
+    build: .
+    container_name: dhn-pi
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:///data/dhn_pi.db
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    devices:
+      # GPIO access (Raspberry Pi)
+      - /dev/gpiomem:/dev/gpiomem
+      # I2C sensors (Raspberry Pi)
+      - /dev/i2c-1:/dev/i2c-1
+    # Fallback: run in privileged mode if device nodes differ
+    # privileged: true

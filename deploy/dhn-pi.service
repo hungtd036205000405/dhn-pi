@@ -1,0 +1,26 @@
+[Unit]
+Description=DHN-Pi IoT Edge Controller
+Documentation=https://github.com/dohana/dhn-pi
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/dhn-pi
+EnvironmentFile=/opt/dhn-pi/.env
+ExecStart=/opt/dhn-pi/venv/bin/dhn-pi
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
