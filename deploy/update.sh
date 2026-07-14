@@ -23,8 +23,8 @@ if ! groups "$CURRENT_USER" | grep -q video; then
 fi
 
 echo ">>> Updating from $PROJECT_DIR to $INSTALL_DIR..."
-cp -r "$PROJECT_DIR"/* "$INSTALL_DIR/"
-cp "$PROJECT_DIR/.env" "$INSTALL_DIR/" 2>/dev/null || true
+sudo cp -r "$PROJECT_DIR"/* "$INSTALL_DIR/"
+sudo cp "$PROJECT_DIR/.env" "$INSTALL_DIR/" 2>/dev/null || true
 
 if [ "$RUN_PIP" = true ]; then
     echo ">>> Reinstalling Python dependencies..."
