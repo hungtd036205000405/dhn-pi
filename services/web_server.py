@@ -61,7 +61,10 @@ class ErrorResponse(BaseModel):
 
 def _row_to_camera(row, online: bool = False, auto_detected: bool | None = None) -> dict:
     if auto_detected is None:
-        auto_detected = bool(row.get("auto_detected", 0))
+        try:
+            auto_detected = bool(row["auto_detected"])
+        except (KeyError, IndexError):
+            auto_detected = False
     return {
         "id": row["id"],
         "name": row["name"],

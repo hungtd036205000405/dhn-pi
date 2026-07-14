@@ -99,10 +99,11 @@ sed -i "s|/opt/dhn-pi|$INSTALL_DIR|g" /etc/systemd/system/dhn-pi.service
 if id "pi" &>/dev/null; then
     SERVICE_USER="pi"
 else
-    SERVICE_USER="root"
+    SERVICE_USER="$(whoami)"
 fi
 sed -i "s/User=pi/User=$SERVICE_USER/" /etc/systemd/system/dhn-pi.service
 sed -i "s/Group=pi/Group=$SERVICE_USER/" /etc/systemd/system/dhn-pi.service
+usermod -a -G video "$SERVICE_USER" 2>/dev/null || true
 
 systemctl daemon-reload
 systemctl enable dhn-pi

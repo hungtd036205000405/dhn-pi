@@ -15,6 +15,13 @@ if ! command -v ffmpeg &>/dev/null; then
     sudo apt-get install -y -qq ffmpeg
 fi
 
+CURRENT_USER="$(whoami)"
+if ! groups "$CURRENT_USER" | grep -q video; then
+    echo ">>> Adding $CURRENT_USER to video group..."
+    sudo usermod -a -G video "$CURRENT_USER"
+    echo "    (logout and login again for group to take effect)"
+fi
+
 echo ">>> Updating from $PROJECT_DIR to $INSTALL_DIR..."
 cp -r "$PROJECT_DIR"/* "$INSTALL_DIR/"
 cp "$PROJECT_DIR/.env" "$INSTALL_DIR/" 2>/dev/null || true
