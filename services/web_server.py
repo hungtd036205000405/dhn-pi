@@ -877,3 +877,7 @@ async def _ensure_camera_active(camera_id: int, controller) -> None:
         ok = await controller.camera_pool.start_camera(camera_id)
         if not ok:
             raise HTTPException(status_code=503, detail="Failed to start camera")
+        for _ in range(10):
+            if controller.camera_pool.get_latest_jpeg(camera_id) is not None:
+                break
+            await asyncio.sleep(0.1)
