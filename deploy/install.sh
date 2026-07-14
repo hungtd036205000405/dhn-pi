@@ -56,6 +56,7 @@ apt-get install -y -qq \
     libxrender-dev \
     libgomp1 \
     i2c-tools \
+    ffmpeg \
     || true  # non-critical on non-Pi
 
 # ---------------------------------------------------------------

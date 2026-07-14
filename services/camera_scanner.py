@@ -62,22 +62,27 @@ class CameraScanner:
         available: list[int] = []
         system = platform.system()
         if system == "Linux":
-            import glob
+            import glob, subprocess
             for dev in sorted(glob.glob("/dev/video*")):
                 try:
-                    idx = int(dev.replace("/dev/video", ""))
+                    r = subprocess.run(
+                        ["ffmpeg", "-f", "v4l2", "-t", "0.2", "-i", dev, "-f", "null", "-"],
+                        capture_output=True, timeout=2,
+                    )
+                    if r.returncode == 0:
+                        idx = int(dev.replace("/dev/video", ""))
+                        available.append(idx)
+                except (ValueError, OSError, subprocess.TimeoutExpired):
+                    pass
+        elif system == "Darwin":
+            for idx in range(4):
+                try:
                     cap = cv2.VideoCapture(idx)
                     if cap.isOpened():
                         available.append(idx)
                         cap.release()
-                except (ValueError, OSError):
+                except Exception:
                     pass
-        elif system == "Darwin":
-            for idx in range(4):
-                cap = cv2.VideoCapture(idx)
-                if cap.isOpened():
-                    available.append(idx)
-                    cap.release()
         return available
 
     async def scan_network(self, subnet: str | None = None) -> list[dict[str, Any]]:

@@ -10,6 +10,11 @@ for arg in "$@"; do
     [[ "$arg" == "--pip" ]] && RUN_PIP=true
 done
 
+if ! command -v ffmpeg &>/dev/null; then
+    echo ">>> ffmpeg not found, installing..."
+    sudo apt-get install -y -qq ffmpeg
+fi
+
 echo ">>> Updating from $PROJECT_DIR to $INSTALL_DIR..."
 cp -r "$PROJECT_DIR"/* "$INSTALL_DIR/"
 cp "$PROJECT_DIR/.env" "$INSTALL_DIR/" 2>/dev/null || true
