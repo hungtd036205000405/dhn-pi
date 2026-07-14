@@ -13,28 +13,6 @@ class CameraScanner:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
-    @staticmethod
-    def _is_capture_device(idx: int) -> bool:
-        skip = ["bcm2835", "isp", "codec", "metadata", "mmal", "feeder"]
-        try:
-            with open(f"/sys/class/video4linux/video{idx}/name") as f:
-                name = f.read().strip().lower()
-            return not any(kw in name for kw in skip)
-        except FileNotFoundError:
-            return True
-
-    @staticmethod
-    def _test_ffmpeg(dev: str) -> bool:
-        import subprocess
-        try:
-            r = subprocess.run(
-                ["ffmpeg", "-f", "v4l2", "-t", "0.2", "-i", dev, "-f", "null", "-"],
-                capture_output=True, timeout=2,
-            )
-            return r.returncode == 0
-        except Exception:
-            return False
-
     async def scan_webcams(self) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         system = platform.system()
@@ -81,23 +59,14 @@ class CameraScanner:
         return results
 
     async def get_available_usb(self) -> list[int]:
-        system = platform.system()
-        if system == "Linux":
-            import asyncio, glob
-            candidates = []
-            for dev in sorted(glob.glob("/dev/video*")):
-                idx = int(dev.replace("/dev/video", ""))
-                if self._is_capture_device(idx):
-                    candidates.append(dev)
-            results = await asyncio.gather(*[
-                asyncio.to_thread(self._test_ffmpeg, dev)
-                for dev in candidates
-            ])
-            return [
-                int(candidates[i].replace("/dev/video", ""))
-                for i, ok in enumerate(results) if ok
-            ]
-        elif system == "Darwin":
+        import glob, os
+        indices: set[int] = set()
+        for link in glob.glob("/dev/v4l/by-id/*-video-index0"):
+            target = os.readlink(link)
+            dev = os.path.basename(target)
+            idx = int(dev.replace("video", ""))
+            indices.add(idx)
+        return sorted(indices)
             import cv2
             available = []
             for idx in range(4):
@@ -152,11 +121,14 @@ class CameraScanner:
     async def _check_rtsp(self, url: str, timeout: int) -> bool:
         import subprocess
         try:
-            r = await asyncio.to_thread(
-                subprocess.run,
-                ["ffprobe", "-t", str(timeout), "-i", url, "-show_entries",
-                 "format=duration", "-of", "csv=p=0", "-loglevel", "quiet"],
-                capture_output=True, timeout=timeout + 1,
+            r = await asyncio.wait_for(
+                asyncio.to_thread(
+                    subprocess.run,
+                    ["ffprobe", "-t", str(timeout), "-i", url, "-show_entries",
+                     "format=duration", "-of", "csv=p=0", "-loglevel", "quiet"],
+                    capture_output=True, timeout=timeout + 1,
+                ),
+                timeout=timeout + 2,
             )
             return r.returncode == 0
         except Exception:

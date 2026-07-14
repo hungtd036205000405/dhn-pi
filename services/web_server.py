@@ -341,14 +341,23 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
 
         rows = await controller.db.fetchall("SELECT * FROM cameras ORDER BY id")
         live_usb_set = set(live_usb)
+
+        ip_rows = [(i, r) for i, r in enumerate(rows) if r["source_type"] == "ip" and r["rtsp_url"]]
+        ip_online: dict[int, bool] = {}
+        if ip_rows:
+            checks = await asyncio.gather(*[
+                controller.camera_scanner._check_rtsp(r["rtsp_url"], 0.5)
+                for _, r in ip_rows
+            ], return_exceptions=True)
+            ip_online = {i: bool(ok) for (i, _), ok in zip(ip_rows, checks) if isinstance(ok, bool)}
+
         result: list[dict] = []
-        for r in rows:
+        for i, r in enumerate(rows):
             if r["source_type"] == "webcam":
                 online = r["device_index"] in live_usb_set
-                if online:
-                    live_usb_set.discard(r["device_index"])
+                live_usb_set.discard(r["device_index"])
             elif r["source_type"] == "ip" and r["rtsp_url"]:
-                online = await controller.camera_scanner._check_rtsp(r["rtsp_url"], 2)
+                online = ip_online.get(i, False)
             else:
                 online = False
             result.append(_row_to_camera(r, online=online))
