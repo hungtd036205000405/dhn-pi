@@ -21,6 +21,8 @@ class CameraResponse(BaseModel):
     height: int
     fps: int
     enabled: bool
+    online: bool = False
+    auto_detected: bool = False
     created_at: str
     updated_at: str
 

@@ -59,7 +59,7 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
-def _row_to_camera(row) -> dict:
+def _row_to_camera(row, online: bool = False, auto_detected: bool = False) -> dict:
     return {
         "id": row["id"],
         "name": row["name"],
@@ -70,6 +70,8 @@ def _row_to_camera(row) -> dict:
         "height": row["height"],
         "fps": row["fps"],
         "enabled": bool(row["enabled"]),
+        "online": online,
+        "auto_detected": auto_detected,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -300,7 +302,36 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
         if not controller:
             raise HTTPException(status_code=503, detail="Controller not initialized")
         rows = await controller.db.fetchall("SELECT * FROM cameras ORDER BY id")
-        return [_row_to_camera(r) for r in rows]
+        live_usb = await controller.camera_scanner.get_available_usb()
+        live_usb_set = set(live_usb)
+        result: list[dict] = []
+        for r in rows:
+            if r["source_type"] == "webcam":
+                online = r["device_index"] in live_usb_set
+                if online:
+                    live_usb_set.discard(r["device_index"])
+            elif r["source_type"] == "ip" and r["rtsp_url"]:
+                online = await controller.camera_scanner._check_rtsp(r["rtsp_url"], 2)
+            else:
+                online = False
+            result.append(_row_to_camera(r, online=online))
+        for idx in sorted(live_usb_set):
+            result.append({
+                "id": -idx,
+                "name": f"USB Webcam {idx}",
+                "source_type": "webcam",
+                "device_index": idx,
+                "rtsp_url": None,
+                "width": 640,
+                "height": 480,
+                "fps": 15,
+                "enabled": True,
+                "online": True,
+                "auto_detected": True,
+                "created_at": "",
+                "updated_at": "",
+            })
+        return result
 
     @app.post(
         "/api/cameras",

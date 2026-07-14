@@ -58,6 +58,28 @@ class CameraScanner:
         logger.info(f"Webcam scan found {len([r for r in results if r['available']])} device(s)")
         return results
 
+    async def get_available_usb(self) -> list[int]:
+        available: list[int] = []
+        system = platform.system()
+        if system == "Linux":
+            import glob
+            for dev in sorted(glob.glob("/dev/video*")):
+                try:
+                    idx = int(dev.replace("/dev/video", ""))
+                    cap = cv2.VideoCapture(idx)
+                    if cap.isOpened():
+                        available.append(idx)
+                        cap.release()
+                except (ValueError, OSError):
+                    pass
+        elif system == "Darwin":
+            for idx in range(4):
+                cap = cv2.VideoCapture(idx)
+                if cap.isOpened():
+                    available.append(idx)
+                    cap.release()
+        return available
+
     async def scan_network(self, subnet: str | None = None) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         target_subnet = subnet or self._config.scan.subnet
