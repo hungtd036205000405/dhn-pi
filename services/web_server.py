@@ -59,7 +59,9 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
-def _row_to_camera(row, online: bool = False, auto_detected: bool = False) -> dict:
+def _row_to_camera(row, online: bool = False, auto_detected: bool | None = None) -> dict:
+    if auto_detected is None:
+        auto_detected = bool(row.get("auto_detected", 0))
     return {
         "id": row["id"],
         "name": row["name"],
@@ -229,7 +231,15 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
                WHERE pc.position_id = ?""",
             (position_id,),
         )
-        result["cameras"] = [_row_to_camera(r) for r in cam_rows]
+        live_usb = set(await controller.camera_scanner.get_available_usb())
+        result["cameras"] = [
+            _row_to_camera(r, online=(
+                r["device_index"] in live_usb if r["source_type"] == "webcam"
+                else await controller.camera_scanner._check_rtsp(r["rtsp_url"], 2) if r["rtsp_url"]
+                else False
+            ))
+            for r in cam_rows
+        ]
 
         ux = await controller.db.fetchone(
             "SELECT * FROM position_uxtx WHERE position_id = ?", (position_id,)
@@ -304,6 +314,30 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
         rows = await controller.db.fetchall("SELECT * FROM cameras ORDER BY id")
         live_usb = await controller.camera_scanner.get_available_usb()
         live_usb_set = set(live_usb)
+
+        seen_indices: set[int] = set()
+        for r in rows:
+            if r["source_type"] == "webcam" and r["device_index"] is not None:
+                seen_indices.add(r["device_index"])
+
+        for idx in sorted(live_usb_set):
+            if idx not in seen_indices:
+                cursor = await controller.db.execute(
+                    """INSERT INTO cameras (name, source_type, device_index, auto_detected)
+                       VALUES (?, ?, ?, 1)""",
+                    (f"USB Webcam {idx}", "webcam", idx),
+                )
+                await controller.db.commit()
+                if controller.camera_pool:
+                    await controller.camera_pool.register_instance(
+                        camera_id=cursor.lastrowid, source_type="webcam",
+                        device_index=idx, rtsp_url=None,
+                        width=640, height=480, fps=15,
+                    )
+                seen_indices.add(idx)
+
+        rows = await controller.db.fetchall("SELECT * FROM cameras ORDER BY id")
+        live_usb_set = set(live_usb)
         result: list[dict] = []
         for r in rows:
             if r["source_type"] == "webcam":
@@ -315,22 +349,6 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
             else:
                 online = False
             result.append(_row_to_camera(r, online=online))
-        for idx in sorted(live_usb_set):
-            result.append({
-                "id": -idx,
-                "name": f"USB Webcam {idx}",
-                "source_type": "webcam",
-                "device_index": idx,
-                "rtsp_url": None,
-                "width": 640,
-                "height": 480,
-                "fps": 15,
-                "enabled": True,
-                "online": True,
-                "auto_detected": True,
-                "created_at": "",
-                "updated_at": "",
-            })
         return result
 
     @app.post(
@@ -527,7 +545,15 @@ def create_app(config: AppConfig, controller=None) -> FastAPI:
                WHERE pc.position_id = ?""",
             (position_id,),
         )
-        return [_row_to_camera(r) for r in rows]
+        live_usb = set(await controller.camera_scanner.get_available_usb())
+        return [
+            _row_to_camera(r, online=(
+                r["device_index"] in live_usb if r["source_type"] == "webcam"
+                else await controller.camera_scanner._check_rtsp(r["rtsp_url"], 2) if r["rtsp_url"]
+                else False
+            ))
+            for r in rows
+        ]
 
     # ---------------------------------------------------- Position UX/TX
     @app.post(

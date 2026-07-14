@@ -54,10 +54,15 @@ class Database:
                 height INTEGER DEFAULT 480,
                 fps INTEGER DEFAULT 15,
                 enabled INTEGER DEFAULT 1,
+                auto_detected INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await self._execute("ALTER TABLE cameras ADD COLUMN auto_detected INTEGER DEFAULT 0")
+        except Exception:
+            pass
         await self._execute("""
             CREATE TABLE IF NOT EXISTS position_cameras (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
