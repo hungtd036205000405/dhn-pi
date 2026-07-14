@@ -67,18 +67,6 @@ class CameraScanner:
             idx = int(dev.replace("video", ""))
             indices.add(idx)
         return sorted(indices)
-            import cv2
-            available = []
-            for idx in range(4):
-                try:
-                    cap = cv2.VideoCapture(idx)
-                    if cap.isOpened():
-                        available.append(idx)
-                        cap.release()
-                except Exception:
-                    pass
-            return available
-        return []
 
     async def scan_network(self, subnet: str | None = None) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
