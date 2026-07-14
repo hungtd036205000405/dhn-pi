@@ -81,10 +81,36 @@ class SchedulerConfig(BaseModel):
     heartbeat_interval: int = 30
 
 
+class CameraPoolConfig(BaseModel):
+    max_active: int = Field(default=4, description="Max concurrent camera captures")
+    preview_width: int = 320
+    preview_height: int = 240
+    preview_fps: int = 5
+    record_width: int = 640
+    record_height: int = 480
+    record_fps: int = 10
+    record_max_minutes: int = 5
+
+
+class RecordingConfig(BaseModel):
+    output_dir: str = "recordings"
+    codec: str = "avc1"
+    auto_split_minutes: int = 5
+
+
+class ScanConfig(BaseModel):
+    network_scan_timeout: int = 3
+    rtsp_ports: list[int] = Field(default_factory=lambda: [554, 8554])
+    subnet: str = "192.168.1.0/24"
+
+
 class AppConfig(BaseModel):
     gpio: GPIOConfig = Field(default_factory=GPIOConfig)
     sensors: SensorConfig = Field(default_factory=SensorConfig)
     camera: CameraConfig = Field(default_factory=CameraConfig)
+    camera_pool: CameraPoolConfig = Field(default_factory=CameraPoolConfig)
+    recording: RecordingConfig = Field(default_factory=RecordingConfig)
+    scan: ScanConfig = Field(default_factory=ScanConfig)
     mqtt: MQTTConfig = Field(default_factory=MQTTConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
@@ -128,6 +154,9 @@ def load_config() -> AppConfig:
         "gpio": yaml_data.get("gpio", {}),
         "sensors": yaml_data.get("sensors", {}),
         "camera": yaml_data.get("camera", {}),
+        "camera_pool": yaml_data.get("camera_pool", {}),
+        "recording": yaml_data.get("recording", {}),
+        "scan": yaml_data.get("scan", {}),
         "mqtt": mqtt_config,
 
         "web": yaml_data.get("web", {}),

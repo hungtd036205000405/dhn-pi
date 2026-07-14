@@ -30,6 +30,28 @@ camera:
   height: 480
   fps: 30
 
+camera_pool:
+  max_active: 4
+  preview_width: 320
+  preview_height: 240
+  preview_fps: 5
+  record_width: 640
+  record_height: 480
+  record_fps: 10
+  record_max_minutes: 5
+
+recording:
+  output_dir: recordings
+  codec: avc1
+  auto_split_minutes: 5
+
+scan:
+  network_scan_timeout: 3
+  rtsp_ports:
+    - 554
+    - 8554
+  subnet: 192.168.1.0/24
+
 mqtt:
   reconnect_delay: 5
   keepalive: 60

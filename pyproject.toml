@@ -24,7 +24,14 @@ dependencies = [
     "uvicorn[standard]",
     "apscheduler",
     "psutil",
+    "aiortc",
+    "av",
 ]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio"]
+webrtc = ["aiortc", "av"]
+scan = ["onvif-zeep"]
 
 [project.scripts]
 dhn-pi = "main:run"
@@ -33,10 +40,7 @@ dhn-pi = "main:run"
 py-modules = ["main"]
 
 [tool.setuptools.packages.find]
-include = ["config*", "core*", "drivers*", "services*", "scripts*"]
-
-[project.optional-dependencies]
-test = ["pytest", "pytest-asyncio"]
+include = ["config*", "core*", "drivers*", "services*", "scripts*", "models*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
